@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parts Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --bg:#0f0f0d;--bg2:#181815;--bg3:#212120;--bg4:#2a2a28;
+    --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+    --text:#e8e6e0;--text2:#9a9890;--text3:#5c5b57;
+    --accent:#c8f07a;--accent2:#a8d458;--accent-dim:rgba(200,240,122,0.12);
+    --danger:#e07070;--danger-dim:rgba(224,112,112,0.12);
+    --info:#78b4e8;--info-dim:rgba(120,180,232,0.12);
+    --amber:#e8c078;--amber-dim:rgba(232,192,120,0.12);
+    --radius:8px;--radius-lg:12px;
+    --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--serif:'Instrument Serif',serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100vh}
+
+  .auth-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+  .auth-logo{font-family:var(--serif);font-size:32px;color:var(--accent)}
+  .auth-logo span{font-style:italic;color:var(--text3);font-size:20px}
+  .auth-card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:32px 40px;display:flex;flex-direction:column;align-items:center;gap:20px;max-width:380px;width:100%}
+  .auth-card h2{font-family:var(--serif);font-size:20px;font-weight:400}
+  .auth-card p{font-size:13px;color:var(--text2);text-align:center;line-height:1.6}
+
+  .sync-status{display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid var(--border)}
+  .sync-status.synced{color:var(--accent2);border-color:rgba(200,240,122,0.3);background:var(--accent-dim)}
+  .sync-status.syncing{color:var(--amber);border-color:rgba(232,192,120,0.3);background:var(--amber-dim)}
+  .sync-status.error{color:var(--danger);border-color:rgba(224,112,112,0.3);background:var(--danger-dim)}
+  .sync-status.offline{color:var(--text3);border-color:var(--border)}
+  .sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+  .sync-dot.pulse{animation:blink 1.2s infinite}
+
+  .app-header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+  .app-logo{font-family:var(--serif);font-size:20px;color:var(--accent);letter-spacing:-0.02em;white-space:nowrap}
+  .app-logo span{font-style:italic;color:var(--text2);font-size:16px}
+  .header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .user-pill{display:flex;align-items:center;gap:7px;padding:4px 10px 4px 4px;border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:background 0.12s}
+  .user-pill:hover{background:var(--bg3)}
+  .user-avatar{width:24px;height:24px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--accent2);overflow:hidden}
+  .user-avatar img{width:100%;height:100%;object-fit:cover}
+  .user-name{font-size:12px;color:var(--text2)}
+
+  .main-layout{display:flex;flex:1;overflow:hidden}
+  .sidebar{width:220px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2);overflow-y:auto}
+  .sidebar-section{padding:16px 14px 8px}
+  .sidebar-label{font-size:10px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:0 2px;margin-bottom:6px}
+  .list-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);cursor:pointer;color:var(--text2);font-size:13px;transition:background 0.12s,color 0.12s;user-select:none;border:1px solid transparent}
+  .list-item:hover{background:var(--bg3);color:var(--text)}
+  .list-item.active{background:var(--accent-dim);color:var(--accent);border-color:rgba(200,240,122,0.2)}
+  .list-item .list-count{margin-left:auto;font-size:11px;font-family:var(--mono);background:var(--bg4);padding:1px 6px;border-radius:10px;color:var(--text3)}
+  .list-item.active .list-count{background:rgba(200,240,122,0.15);color:var(--accent2)}
+  .sidebar-add{display:flex;align-items:center;gap:6px;padding:7px 12px;color:var(--text3);font-size:12px;cursor:pointer;border-radius:var(--radius);transition:color 0.12s;margin:2px 14px}
+  .sidebar-add:hover{color:var(--accent)}
+  .sidebar-footer{margin-top:auto;padding:12px 14px;border-top:1px solid var(--border)}
+  .stat-mini{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .stat-mini-label{font-size:11px;color:var(--text3)}
+  .stat-mini-val{font-size:13px;font-family:var(--mono);color:var(--text2)}
+  .stat-mini-val.accent{color:var(--accent)}
+
+  .content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .content-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0}
+  .list-title-edit{background:none;border:none;font-size:18px;font-family:var(--serif);color:var(--text);outline:none;cursor:text;border-bottom:1px solid transparent;transition:border-color 0.15s}
+  .list-title-edit:focus{border-bottom-color:var(--border2)}
+  .content-toolbar{padding:10px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+  .search-wrap{position:relative;flex:1;min-width:180px;max-width:340px}
+  .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none}
+  .search-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px 7px 32px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color 0.15s}
+  .search-input:focus{border-color:var(--border2)}
+  .search-input::placeholder{color:var(--text3)}
+
+  button{font-family:var(--font);cursor:pointer;border:none;outline:none;transition:all 0.12s}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);font-size:13px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all 0.12s;white-space:nowrap}
+  .btn:hover{background:var(--bg4);color:var(--text)}
+  .btn:active{transform:scale(0.97)}
+  .btn-primary{background:var(--accent);color:#0f0f0d;border-color:var(--accent);font-weight:500}
+  .btn-primary:hover{background:var(--accent2);border-color:var(--accent2);color:#0f0f0d}
+  .btn-danger{color:var(--danger);border-color:rgba(224,112,112,0.3)}
+  .btn-danger:hover{background:var(--danger-dim)}
+  .btn-sm{padding:4px 10px;font-size:12px;height:26px}
+  .btn-icon{padding:6px 8px;color:var(--text3);border-color:transparent;background:transparent}
+  .btn-icon:hover{color:var(--text);background:var(--bg4);border-color:var(--border)}
+  .btn-google{background:#fff;color:#3c4043;border:1px solid #dadce0;font-size:14px;padding:10px 20px;border-radius:8px;display:flex;align-items:center;gap:10px;font-weight:500;cursor:pointer}
+  .btn-google:hover{background:#f8f9fa;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+
+  .table-wrap{flex:1;overflow-y:auto}
+  table{width:100%;border-collapse:collapse}
+  thead th{text-align:left;padding:10px 16px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:2;white-space:nowrap}
+  tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
+  tbody tr:last-child{border-bottom:none}
+  tbody tr:hover{background:var(--bg2)}
+  tbody td{padding:10px 16px;vertical-align:middle}
+  .part-name{font-size:14px;color:var(--text)}
+  .part-notes{font-size:11px;color:var(--text3);margin-top:2px}
+  .part-num{font-size:12px;font-family:var(--mono);color:var(--text2);background:var(--bg3);padding:2px 7px;border-radius:4px;display:inline-block}
+  .price-best{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--accent)}
+  .price-none{color:var(--text3);font-size:12px;font-style:italic}
+  .supplier-chips{display:flex;gap:4px;flex-wrap:wrap}
+  .chip{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--border);color:var(--text3);cursor:pointer;transition:all 0.12s;background:var(--bg3);white-space:nowrap}
+  .chip:hover{border-color:var(--border2);color:var(--text2)}
+  .chip.has-price{border-color:rgba(200,240,122,0.3);color:var(--accent2);background:var(--accent-dim)}
+  .chip.chip-stale{border-color:rgba(232,192,120,0.3);color:var(--amber);background:var(--amber-dim)}
+  .actions{display:flex;gap:4px;opacity:0;transition:opacity 0.15s}
+  tbody tr:hover .actions{opacity:1}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text3)}
+  .empty-state h3{font-family:var(--serif);font-size:22px;color:var(--text2);margin-bottom:8px;font-weight:400}
+  .empty-state p{font-size:13px;line-height:1.6}
+  .no-list{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:15px;font-family:var(--serif)}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn 0.15s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);width:min(580px,100%);max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;animation:slideUp 0.18s ease}
+  @keyframes slideUp{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+  .modal-header{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+  .modal-title{font-family:var(--serif);font-size:18px;font-weight:400}
+  .modal-body{padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+  .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text3)}
+  input[type=text],input[type=number],input[type=url],select,textarea{font-family:var(--font);font-size:13px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 12px;color:var(--text);outline:none;transition:border-color 0.15s}
+  input:focus,select:focus,textarea:focus{border-color:rgba(200,240,122,0.4)}
+  input::placeholder,textarea::placeholder{color:var(--text3)}
+  textarea{resize:vertical;min-height:64px;line-height:1.5}
+  select{cursor:pointer}
+  .supplier-rows{display:flex;flex-direction:column;gap:8px}
+  .supplier-row{display:grid;grid-template-columns:120px 1fr 90px auto;gap:6px;align-items:start}
+  .supplier-fetch-status{font-size:11px;margin-top:2px;grid-column:1/-1;padding-left:2px}
+  .status-ok{color:var(--accent2)}
+  .status-err{color:var(--danger)}
+  .status-loading{color:var(--text3)}
+
+  .price-compare-list{display:flex;flex-direction:column;gap:6px}
+  .price-compare-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg3)}
+  .price-compare-item.best{border-color:rgba(200,240,122,0.3);background:var(--accent-dim)}
+  .price-compare-name{font-size:13px;color:var(--text);flex:1}
+  .price-compare-url{font-size:11px;color:var(--info);cursor:pointer}
+  .price-compare-url:hover{text-decoration:underline}
+  .price-compare-val{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--text2)}
+  .price-compare-val.best-val{color:var(--accent)}
+  .best-badge{font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(200,240,122,0.3);letter-spacing:0.04em;text-transform:uppercase}
+
+  .csv-format{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.7}
+  .fetch-progress{padding:6px 0;font-size:12px;color:var(--text2);font-family:var(--mono)}
+  .progress-bar-wrap{height:4px;background:var(--bg3);border-radius:2px;margin-top:6px;overflow:hidden}
+  .progress-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s}
+
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+  .dot-fetching{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 0.9s infinite;margin-right:4px;vertical-align:middle}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const CLIENT_ID='558911037080-ij8rh2hkjkbfata3essjcnia5n8lktbh.apps.googleusercontent.com';
+const SCOPES='https://www.googleapis.com/auth/drive.file';
+const FILE_NAME='parts-manager-data.json';
+const LS_KEY='partsmanager_v3';
+
+let driveState={accessToken:null,fileId:null,user:null,syncStatus:'offline',lastSaved:null,tokenClient:null};
+let state={lists:[{id:uid(),name:'Car parts',icon:'🚗',parts:[]},{id:uid(),name:'Workshop',icon:'🔧',parts:[]}],activeList:null,search:'',sort:'name',modal:null,fetchProgress:null};
+
+function uid(){return Math.random().toString(36).slice(2,10)}
+
+// ── Local storage ──
+function saveLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify({lists:state.lists,activeList:state.activeList,driveFileId:driveState.fileId}));}catch(e){}}
+function loadLocal(){
+  try{
+    const d=localStorage.getItem(LS_KEY);
+    if(d){const p=JSON.parse(d);if(p.lists&&p.lists.length)state.lists=p.lists;if(p.activeList)state.activeList=p.activeList;if(p.driveFileId)driveState.fileId=p.driveFileId;}
+  }catch(e){}
+  if(!state.activeList)state.activeList=state.lists[0]?.id||null;
+}
+loadLocal();
+
+// ── Drive API ──
+async function driveReq(method,path,body,params){
+  const url=new URL('https://www.googleapis.com'+path);
+  if(params)Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  const headers={Authorization:'Bearer '+driveState.accessToken};
+  let b=body;
+  if(body&&typeof body==='object'&&!(body instanceof FormData)){headers['Content-Type']='application/json';b=JSON.stringify(body);}
+  const r=await fetch(url,{method,headers,body:b});
+  if(r.status===401){driveState.accessToken=null;throw new Error('Token expired');}
+  if(!r.ok)throw new Error('Drive API '+r.status);
+  const ct=r.headers.get('content-type')||'';
+  return ct.includes('json')?r.json():r.text();
+}
+
+async function findOrCreateFile(){
+  // Shared file — all authorised users read/write the same Drive file
+  driveState.fileId='1niwJqTDVY0kC-iWJqZnD5Q4qBIFExpTE';
+  saveLocal();
+  return driveState.fileId;
+}
+
+async function loadFromDrive(){
+  if(!driveState.accessToken)return;
+  setSyncStatus('syncing');
+  try{
+    const fileId=driveState.fileId||await findOrCreateFile();
+    // Fetch raw file content — don't use driveReq here as alt:media returns raw bytes not JSON headers
+    const r=await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',{
+      headers:{Authorization:'Bearer '+driveState.accessToken}
+    });
+    if(r.status===403){throw new Error('Permission denied — make sure the file is shared with this Google account (Editor access)');}
+    if(r.status===404){throw new Error('File not found — check the file ID and sharing settings');}
+    if(!r.ok){throw new Error('Drive error '+r.status);}
+    const text=await r.text();
+    let data;
+    try{data=JSON.parse(text);}catch(e){throw new Error('File content is not valid JSON');}
+    if(data&&data.lists&&data.lists.length){
+      state.lists=data.lists;
+      state.activeList=data.activeList||data.lists[0]?.id;
+    }
+    saveLocal();setSyncStatus('synced');render();
+  }catch(e){
+    console.error('Load failed:',e);
+    setSyncStatus('error');
+    // Show the error visibly in the app so we can diagnose
+    const errBanner=document.getElementById('drive-err');
+    if(errBanner){errBanner.textContent='Drive error: '+e.message;errBanner.style.display='block';}
+    render();
+  }
+}
+
+async function saveToDrive(){
+  if(!driveState.accessToken){saveLocal();return;}
+  setSyncStatus('syncing');
+  try{
+    const fileId=driveState.fileId||await findOrCreateFile();
+    const body=JSON.stringify({lists:state.lists,activeList:state.activeList});
+    const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+fileId+'?uploadType=media',{
+      method:'PATCH',
+      headers:{Authorization:'Bearer '+driveState.accessToken,'Content-Type':'application/json'},
+      body
+    });
+    if(r.status===403){throw new Error('Permission denied — file not shared with Editor access');}
+    if(!r.ok){throw new Error('Save error '+r.status);}
+    driveState.lastSaved=new Date();saveLocal();setSyncStatus('synced');
+  }catch(e){console.error('Save failed:',e);saveLocal();setSyncStatus('error');}
+}
+
+function setSyncStatus(s){
+  driveState.syncStatus=s;
+  const el=document.getElementById('sync-badge');
+  if(el)el.outerHTML=buildSyncBadge();
+}
+
+function save(){saveToDrive();}
+
+// ── Auth ──
+function initGoogleAuth(){
+  if(typeof google==='undefined'){setTimeout(initGoogleAuth,300);return;}
+  driveState.tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPES,
+    callback:async(resp)=>{
+      if(resp.error){console.error(resp);return;}
+      driveState.accessToken=resp.access_token;
+      try{const info=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+resp.access_token}}).then(r=>r.json());driveState.user=info;}catch(e){}
+      if(driveState.user?.email)localStorage.setItem('pm_hint',driveState.user.email);
+      await loadFromDrive();
+    }
+  });
+  const hint=localStorage.getItem('pm_hint');
+  if(hint){driveState.tokenClient.requestAccessToken({prompt:'none',login_hint:hint});}
+  else{render();}
+}
+
+window.signIn=()=>driveState.tokenClient.requestAccessToken({prompt:'consent'});
+window.signOut=()=>{
+  if(driveState.accessToken)google.accounts.oauth2.revoke(driveState.accessToken);
+  driveState.accessToken=null;driveState.user=null;driveState.fileId=null;driveState.syncStatus='offline';
+  localStorage.removeItem('pm_hint');render();
+};
+window.confirmSignOut=()=>{if(confirm('Sign out? Your data stays in Google Drive.'))window.signOut();};
+
+// ── Helpers ──
+function getList(id){return state.lists.find(l=>l.id===(id||state.activeList));}
+function bestPrice(part){
+  const prices=part.suppliers.filter(s=>s.price!==''&&s.price!=null&&!isNaN(parseFloat(s.price)));
+  if(!prices.length)return null;
+  return Math.min(...prices.map(s=>parseFloat(s.price)));
+}
+function filteredSortedParts(){
+  const list=getList();if(!list)return[];
+  const q=state.search.toLowerCase();
+  let parts=list.parts.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.partNum||'').toLowerCase().includes(q)||(p.notes||'').toLowerCase().includes(q));
+  if(state.sort==='price')parts=parts.slice().sort((a,b)=>{const pa=bestPrice(a),pb=bestPrice(b);if(pa==null&&pb==null)return 0;if(pa==null)return 1;if(pb==null)return -1;return pa-pb;});
+  else if(state.sort==='added')parts=parts.slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+  else parts=parts.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  return parts;
+}
+
+// ── Price fetch ──
+async function fetchPrice(url){
+  if(!url)return{price:null,err:'No URL'};
+  const proxies=[`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,`https://corsproxy.io/?${encodeURIComponent(url)}`];
+  for(const proxy of proxies){
+    try{
+      const r=await fetch(proxy,{signal:AbortSignal.timeout(9000)});
+      if(!r.ok)continue;
+      const html=await r.text();
+      const patterns=[
+        /itemprop="price"[^>]*content="([0-9.,]+)"/i,
+        /content="([0-9.,]+)"[^>]*itemprop="price"/i,
+        /"price"\s*:\s*"([0-9.,]+)"/,
+        /"price"\s*:\s*([0-9.]+)/,
+        /"offers"\s*:[^}]*"price"\s*:\s*"?([0-9.,]+)"?/,
+        /property="product:price:amount"[^>]*content="([0-9.,]+)"/i,
+        /class="[^"]*product-price[^"]*"[^>]*>\s*[^<]*\$\s*([0-9,]+\.?[0-9]{0,2})/i,
+        /class="[^"]*price__current[^"]*"[^>]*>\s*[^<]*\$\s*([0-9,]+\.?[0-9]{0,2})/i,
+        /class="[^"]*selling-price[^"]*"[^>]*>\s*[^<]*\$\s*([0-9,]+\.?[0-9]{0,2})/i,
+        /class="[^"]*now-price[^"]*"[^>]*>\s*[^<]*\$\s*([0-9,]+\.?[0-9]{0,2})/i,
+        /class="[^"]*sale-price[^"]*"[^>]*>\s*[^<]*\$\s*([0-9,]+\.?[0-9]{0,2})/i,
+        /class="[^"]*Price[^"]*"[^>]*>\s*[^<]*\$\s*([0-9,]+\.?[0-9]{0,2})/,
+        /class="[^"]*price[^"]*"[^>]*>\s*\$?\s*([0-9,]+\.[0-9]{2})/i,
+        /AUD\s*\$?\s*([0-9,]+\.?[0-9]{0,2})/i,
+        /([0-9,]+\.[0-9]{2})\s*AUD/i,
+        /\$\s*([0-9,]+\.[0-9]{2})/,
+      ];
+      for(const pat of patterns){const m=html.match(pat);if(m){const val=parseFloat(m[1].replace(/,/g,''));if(!isNaN(val)&&val>0&&val<100000)return{price:val,err:null};}}
+      return{price:null,err:'Price not found on page'};
+    }catch(e){continue;}
+  }
+  return{price:null,err:'Could not reach page'};
+}
+
+// ── Render ──
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function buildSyncBadge(){
+  const s=driveState.syncStatus;
+  const labels={synced:'Saved to Drive',syncing:'Saving…',error:'Sync error',offline:'Local only'};
+  const pulse=s==='syncing'?' pulse':'';
+  return`<span class="sync-status ${s}" id="sync-badge"><span class="sync-dot${pulse}"></span>${labels[s]}</span>`;
+}
+
+function render(){
+  if(!driveState.accessToken){renderAuth();return;}
+  renderApp();
+}
+
+function renderAuth(){
+  document.getElementById('app').innerHTML=`
+  <div class="auth-screen">
+    <div class="auth-logo">Parts Manager <span>/ workshop tracker</span></div>
+    <div class="auth-card">
+      <div style="font-size:36px">📁</div>
+      <h2>Sign in to get started</h2>
+      <p>Your parts lists sync automatically to Google Drive — available on any device, any browser.</p>
+      <button class="btn-google" onclick="signIn()">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+        Sign in with Google
+      </button>
+      <p style="font-size:11px;color:var(--text3)">Only accesses files it creates. Your data stays in your own Drive.</p>
+    </div>
+  </div>`;
+}
+
+function renderApp(){
+  const list=getList();
+  const parts=filteredSortedParts();
+  const allParts=list?list.parts:[];
+  const totalBest=allParts.reduce((s,p)=>s+(bestPrice(p)||0),0);
+  const withPrice=allParts.filter(p=>bestPrice(p)!=null).length;
+  const allSuppliers=[...new Set(allParts.flatMap(p=>p.suppliers.map(s=>s.name)).filter(Boolean))];
+  const userName=driveState.user?.name||driveState.user?.email||'';
+  const userPic=driveState.user?.picture||'';
+  const initials=userName?userName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase():'?';
+
+  document.getElementById('app').innerHTML=`
+  <div id="drive-err" style="display:none;background:var(--danger-dim);color:var(--danger);border-bottom:1px solid rgba(224,112,112,0.3);padding:8px 20px;font-size:12px;font-family:var(--mono)"></div>
+  <div class="app-header">
+    <div class="app-logo">Parts Manager <span>/ workshop tracker</span></div>
+    ${buildSyncBadge()}
+    <div class="header-right">
+      <button class="btn btn-sm" onclick="openImport()">Import CSV</button>
+      <button class="btn btn-sm" onclick="exportCSV()">Export CSV</button>
+      <div class="user-pill" onclick="confirmSignOut()" title="Click to sign out">
+        <div class="user-avatar">${userPic?`<img src="${esc(userPic)}" referrerpolicy="no-referrer">`:initials}</div>
+        <span class="user-name">${esc(userName.split(' ')[0]||'Account')}</span>
+      </div>
+    </div>
+  </div>
+  <div class="main-layout">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Lists</div>
+        ${state.lists.map(l=>`
+          <div class="list-item ${l.id===state.activeList?'active':''}" onclick="switchList('${l.id}')">
+            <span>${l.icon||'📋'}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.name)}</span>
+            <span class="list-count">${l.parts.length}</span>
+          </div>`).join('')}
+        <div class="sidebar-add" onclick="addList()">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          New list
+        </div>
+      </div>
+      ${list?`
+      <div class="sidebar-footer">
+        <div class="stat-mini"><span class="stat-mini-label">Parts total</span><span class="stat-mini-val">${allParts.length}</span></div>
+        <div class="stat-mini"><span class="stat-mini-label">Priced</span><span class="stat-mini-val">${withPrice} / ${allParts.length}</span></div>
+        <div class="stat-mini"><span class="stat-mini-label">Best total cost</span><span class="stat-mini-val accent">$${totalBest.toFixed(2)}</span></div>
+        <div class="stat-mini"><span class="stat-mini-label">Suppliers</span><span class="stat-mini-val">${allSuppliers.length}</span></div>
+      </div>`:''}
+    </div>
+    ${!list?`<div class="content"><div class="no-list">Select or create a list to get started</div></div>`:`
+    <div class="content">
+      <div class="content-header">
+        <input class="list-title-edit" value="${esc(list.name)}" onchange="renameList(this.value)" onblur="renameList(this.value)" style="max-width:300px">
+        <span style="font-size:22px;margin-left:4px">${list.icon||'📋'}</span>
+        ${state.lists.length>1?`<button class="btn btn-sm btn-danger" style="margin-left:8px" onclick="deleteList()">Delete list</button>`:''}
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          ${state.fetchProgress!=null?`
+            <div class="fetch-progress">
+              <span class="dot-fetching"></span>Fetching ${state.fetchProgress.done}/${state.fetchProgress.total}
+              <div class="progress-bar-wrap" style="width:120px;display:inline-block;margin-left:8px;vertical-align:middle">
+                <div class="progress-bar-fill" style="width:${Math.round(state.fetchProgress.done/state.fetchProgress.total*100)}%"></div>
+              </div>
+            </div>
+          `:`<div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="fetchAllPrices()">↻ Auto refresh</button><button class="btn btn-sm" onclick="openQuickCheck()" style="color:var(--amber);border-color:rgba(232,192,120,0.3)">⚡ Quick check</button></div>`}
+          <button class="btn btn-sm btn-primary" onclick="openAdd()">+ Add part</button>
+        </div>
+      </div>
+      <div class="content-toolbar">
+        <div class="search-wrap">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="m9.5 9.5 2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <input class="search-input" type="text" placeholder="Search parts, part numbers..." value="${esc(state.search)}" oninput="setSearch(this.value)">
+        </div>
+        <select onchange="setSort(this.value)" style="font-size:13px;height:34px;background:var(--bg3);color:var(--text2)">
+          <option value="name" ${state.sort==='name'?'selected':''}>Name</option>
+          <option value="price" ${state.sort==='price'?'selected':''}>Best price</option>
+          <option value="added" ${state.sort==='added'?'selected':''}>Newest</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        ${parts.length===0?`
+          <div class="empty-state">
+            <h3>${state.search?'No matching parts':'No parts yet'}</h3>
+            <p>${state.search?'Try a different search term.':'Click "+ Add part" to add your first part to this list.'}</p>
+          </div>
+        `:`
+        <table>
+          <thead><tr>
+            <th style="width:28%">Part</th>
+            <th style="width:14%">Part number</th>
+            <th style="width:14%">Best price</th>
+            <th>Suppliers</th>
+            <th style="width:80px"></th>
+          </tr></thead>
+          <tbody>
+            ${parts.map(p=>{
+              const bp=bestPrice(p);
+              const priced=p.suppliers.filter(s=>s.price!==''&&s.price!=null&&!isNaN(parseFloat(s.price)));
+              return`<tr data-partid="${p.id}">
+                <td>
+                  <div class="part-name">${esc(p.name)}</div>
+                  ${p.notes?`<div class="part-notes">${esc(p.notes)}</div>`:''}
+                </td>
+                <td>${p.partNum?`<span class="part-num">${esc(p.partNum)}</span>`:`<span style="color:var(--text3)">—</span>`}</td>
+                <td class="price-cell">
+                  ${bp!=null?`<span class="price-best">$${bp.toFixed(2)}</span>${priced.length>1?`<div style="font-size:11px;color:var(--text3);margin-top:1px">${priced.length} suppliers</div>`:''}`:`<span class="price-none">not set</span>`}
+                </td>
+                <td>
+                  <div class="supplier-chips">
+                    ${p.suppliers.map(s=>{
+                      const hasPrice=s.price!==''&&s.price!=null&&!isNaN(parseFloat(s.price));
+                      const isManual=hasPrice&&s.priceSource!=='fetched';
+                      return`<span class="chip ${hasPrice?'has-price':''}${isManual&&s.url?' chip-stale':''}" onclick="openPriceDetail('${p.id}')" title="${esc(isManual&&s.url?'Manual price — not verified by fetch':'')}">${esc(s.name||'?')}${hasPrice?' · $'+parseFloat(s.price).toFixed(2)+(isManual&&s.url?' ⚠':''):''}</span>`;
+                    }).join('')}
+                  </div>
+                </td>
+                <td>
+                  <div class="actions">
+                    <button class="btn btn-sm btn-icon" onclick="openEdit('${p.id}')" title="Edit">
+                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M9.5 1.5l2 2L4 11H2v-2L9.5 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+                    </button>
+                    <button class="btn btn-sm btn-icon btn-danger" onclick="deletePart('${p.id}')" title="Delete">
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 1l9 9M10 1L1 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`}
+      </div>
+    </div>`}
+  </div>
+  ${buildModal()}`;
+  attachEvents();
+}
+
+function buildModal(){
+  const m=state.modal;if(!m)return'';
+  const closeBtn=`<button class="btn btn-icon" style="margin-left:auto" onclick="closeModal()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>`;
+
+  if(m.type==='add'||m.type==='edit'){
+    return`<div class="modal-overlay" id="modal-overlay"><div class="modal">
+      <div class="modal-header"><div class="modal-title">${m.type==='add'?'Add part':'Edit part'}</div>${closeBtn}</div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field"><label>Part name *</label><input type="text" id="f-name" value="${esc(m.name||'')}" placeholder="e.g. Oil filter"></div>
+          <div class="field"><label>Part number</label><input type="text" id="f-partnum" value="${esc(m.partNum||'')}" placeholder="e.g. WIX-51334"></div>
+        </div>
+        <div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Optional notes...">${esc(m.notes||'')}</textarea></div>
+        <div class="field">
+          <label>Suppliers</label>
+          <div class="supplier-rows" id="supplier-rows">${m.suppliers.map(s=>buildSupplierRow(s)).join('')}</div>
+          <button class="btn btn-sm" style="align-self:flex-start;margin-top:6px" onclick="addSupplier()">+ Add supplier</button>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePart()">Save part</button></div>
+    </div></div>`;
+  }
+
+  if(m.type==='price'){
+    const part=m.part,bp=bestPrice(part);
+    return`<div class="modal-overlay" id="modal-overlay"><div class="modal">
+      <div class="modal-header">
+        <div><div class="modal-title">${esc(part.name)}</div>${part.partNum?`<div style="font-size:12px;font-family:var(--mono);color:var(--text3);margin-top:2px">${esc(part.partNum)}</div>`:''}</div>
+        ${closeBtn}
+      </div>
+      <div class="modal-body">
+        ${part.suppliers.length===0?`<p style="color:var(--text3);font-size:13px">No suppliers added yet.</p>`:`
+        <div class="price-compare-list">
+          ${part.suppliers.map(s=>{
+            const p=s.price!==''&&s.price!=null?parseFloat(s.price):null;
+            const isBest=p!=null&&p===bp;
+            const isManual=s.priceSource!=='fetched';
+            const fetchedDate=s.fetchedAt?new Date(s.fetchedAt).toLocaleDateString('en-AU'):null;
+            return`<div class="price-compare-item ${isBest?'best':''}">
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span class="price-compare-name">${esc(s.name||'Unknown')}</span>
+                  ${isBest?`<span class="best-badge">best price</span>`:''}
+                  ${s.url&&isManual?`<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(232,192,120,0.3)">manual</span>`:''}
+                  ${s.url&&!isManual?`<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:var(--accent-dim);color:var(--accent2);border:1px solid rgba(200,240,122,0.3)">live${fetchedDate?' · '+fetchedDate:''}</span>`:''}
+                </div>
+                ${s.url?`<div class="price-compare-url" onclick="window.open('${esc(s.url)}','_blank')">${esc(s.url.replace(/^https?:\/\//,'').split('/')[0])} ↗</div>`:''}
+                ${s.fetchErr?`<div style="font-size:11px;color:var(--danger);margin-top:2px">Last fetch: ${esc(s.fetchErr)}</div>`:''}
+              </div>
+              <div class="price-compare-val ${isBest?'best-val':''}">${p!=null?'$'+p.toFixed(2):'—'}</div>
+            </div>`;
+          }).join('')}
+        </div>`}
+        ${bp!=null?`<div style="padding:10px 14px;background:var(--bg3);border-radius:var(--radius);display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+          <span style="font-size:13px;color:var(--text2)">Best available price</span>
+          <span style="font-family:var(--mono);font-size:18px;font-weight:500;color:var(--accent)">$${bp.toFixed(2)}</span>
+        </div>`:''}
+      </div>
+      <div class="modal-footer"><button class="btn" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="closeModal();openEdit('${part.id}')">Edit part</button></div>
+    </div></div>`;
+  }
+
+  if(m.type==='quickcheck'){
+    const items=m.items;
+    const current=items[m.index];
+    const done=m.index>=items.length;
+    return`<div class="modal-overlay" id="modal-overlay"><div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Quick price check</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${m.index} of ${items.length} done</div>
+        </div>
+        ${closeBtn}
+      </div>
+      <div class="modal-body">
+        ${done?`
+          <div style="text-align:center;padding:20px 0">
+            <div style="font-size:32px;margin-bottom:12px">✓</div>
+            <div style="font-size:15px;color:var(--text2)">All prices checked!</div>
+          </div>
+        `:`
+          <div style="font-size:12px;color:var(--text3);margin-bottom:4px">${esc(current.partName)}</div>
+          <div style="font-size:16px;font-weight:500;color:var(--text);margin-bottom:4px">${esc(current.supplierName)}</div>
+          <a href="${esc(current.url)}" target="_blank" style="font-size:12px;color:var(--info);word-break:break-all">${esc(current.url)}</a>
+          <div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:12px;color:var(--text2)">Current price</span>
+            <span style="font-family:var(--mono);color:var(--text2)">${current.currentPrice!=null?'$'+parseFloat(current.currentPrice).toFixed(2):'not set'}</span>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label>Enter price from the page</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="color:var(--text2);font-size:16px">$</span>
+              <input type="number" id="qc-price" step="0.01" placeholder="0.00" value="${current.currentPrice!=null?parseFloat(current.currentPrice).toFixed(2):''}" style="flex:1;font-size:18px;font-family:var(--mono)" autofocus>
+            </div>
+          </div>
+          <button class="btn btn-sm" onclick="window.open('${esc(current.url)}','_blank')" style="margin-top:8px;color:var(--info);border-color:rgba(120,180,232,0.3)">Open page in new tab ↗</button>
+        `}
+        <div style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:11px;color:var(--text3)">Progress</span>
+            <span style="font-size:11px;color:var(--text3)">${m.index}/${items.length}</span>
+          </div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${Math.round(m.index/items.length*100)}%;background:var(--amber)"></div></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal()">Done</button>
+        ${!done?`<button class="btn" onclick="quickCheckSkip()">Skip</button><button class="btn btn-primary" onclick="quickCheckSave()">Save &amp; next</button>`:''}
+      </div>
+    </div></div>`;
+  }
+
+  if(m.type==='import'){
+    return`<div class="modal-overlay" id="modal-overlay"><div class="modal">
+      <div class="modal-header"><div class="modal-title">Import CSV</div>${closeBtn}</div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text2)">Export your Google Sheet as CSV (File → Download → CSV), paste or upload below.</p>
+        <div class="csv-format">name, partNum, notes<br>supplier1Name, supplier1URL, supplier1Price<br>supplier2Name, supplier2URL, supplier2Price</div>
+        <div class="field"><label>Paste CSV</label><textarea id="csv-text" style="min-height:120px;font-family:var(--mono);font-size:12px" placeholder="name,partNum,notes,supplier1Name,..."></textarea></div>
+        <div class="field"><label>Or upload file</label><input type="file" accept=".csv,.txt" onchange="loadCSVFile(this)" style="color:var(--text2)"></div>
+        <div style="font-size:12px;color:var(--text3)">Parts will be added to: <strong style="color:var(--text2)">${esc(getList()?.name||'')}</strong></div>
+      </div>
+      <div class="modal-footer"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doImport()">Import parts</button></div>
+    </div></div>`;
+  }
+  return'';
+}
+
+function buildSupplierRow(s){
+  return`<div data-sid="${s.id}" style="display:flex;flex-direction:column;gap:4px">
+    <div class="supplier-row">
+      <input type="text" placeholder="Supplier name" value="${esc(s.name||'')}" oninput="updateSup('${s.id}','name',this.value)" style="font-size:12px">
+      <input type="url" placeholder="Product URL" value="${esc(s.url||'')}" oninput="updateSup('${s.id}','url',this.value)" style="font-size:12px">
+      <input type="number" placeholder="Price" value="${s.price!==''&&s.price!=null?s.price:''}" oninput="updateSup('${s.id}','price',this.value)" step="0.01" style="font-size:12px">
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-sm btn-icon" onclick="fetchOneSup('${s.id}')" title="Fetch price from URL">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6A4 4 0 1 1 6 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10 2v4H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="btn btn-sm btn-icon btn-danger" onclick="removeSup('${s.id}')">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="fstatus-${s.id}" class="supplier-fetch-status"></div>
+  </div>`;
+}
+
+function attachEvents(){
+  const overlay=document.getElementById('modal-overlay');
+  if(overlay)overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
+}
+
+// ── Actions ──
+window.switchList=id=>{state.activeList=id;state.search='';render();};
+window.setSearch=v=>{state.search=v;render();};
+window.setSort=v=>{state.sort=v;render();};
+window.closeModal=()=>{state.modal=null;render();};
+
+window.addList=()=>{
+  const name=prompt('List name:');if(!name)return;
+  const icons=['🚗','🔧','🏎️','⚙️','🛞','🔩','🪛','📦'];
+  const l={id:uid(),name:name.trim(),icon:icons[Math.floor(Math.random()*icons.length)],parts:[]};
+  state.lists.push(l);state.activeList=l.id;save();render();
+};
+window.deleteList=()=>{
+  if(state.lists.length<=1)return;
+  if(!confirm(`Delete "${getList()?.name}" and all its parts?`))return;
+  state.lists=state.lists.filter(l=>l.id!==state.activeList);
+  state.activeList=state.lists[0].id;save();render();
+};
+window.renameList=val=>{const l=getList();if(l&&val.trim()){l.name=val.trim();save();}};
+window.openAdd=()=>{state.modal={type:'add',name:'',partNum:'',notes:'',suppliers:[{id:uid(),name:'',url:'',price:''}]};render();};
+window.openEdit=id=>{
+  const p=getList()?.parts.find(x=>x.id===id);if(!p)return;
+  state.modal={type:'edit',partId:id,name:p.name,partNum:p.partNum||'',notes:p.notes||'',suppliers:JSON.parse(JSON.stringify(p.suppliers.length?p.suppliers:[{id:uid(),name:'',url:'',price:''}]))};
+  render();
+};
+window.openPriceDetail=id=>{const p=getList()?.parts.find(x=>x.id===id);if(p){state.modal={type:'price',part:p};render();}};
+window.openImport=()=>{state.modal={type:'import'};render();};
+window.addSupplier=()=>{if(!state.modal)return;state.modal.suppliers.push({id:uid(),name:'',url:'',price:''});render();};
+window.removeSup=sid=>{
+  if(!state.modal)return;
+  if(state.modal.suppliers.length===1){alert('At least one supplier row required.');return;}
+  state.modal.suppliers=state.modal.suppliers.filter(s=>s.id!==sid);render();
+};
+window.updateSup=(sid,field,val)=>{if(!state.modal)return;const s=state.modal.suppliers.find(x=>x.id===sid);if(s)s[field]=val;};
+
+window.savePart=()=>{
+  const m=state.modal;if(!m)return;
+  const name=document.getElementById('f-name')?.value?.trim();
+  if(!name){alert('Part name is required.');return;}
+  m.suppliers.forEach(s=>{
+    const el=document.querySelector(`[data-sid="${s.id}"]`);if(!el)return;
+    const n=el.querySelector('input[type=text]'),u=el.querySelector('input[type=url]'),p=el.querySelector('input[type=number]');
+    if(n)s.name=n.value;if(u)s.url=u.value;if(p)s.price=p.value;
+  });
+  const part={
+    id:m.type==='edit'?m.partId:uid(),
+    name,
+    partNum:document.getElementById('f-partnum')?.value?.trim()||'',
+    notes:document.getElementById('f-notes')?.value?.trim()||'',
+    suppliers:m.suppliers.filter(s=>s.name||s.url||(s.price!==''&&s.price!=null)).map(s=>({...s,priceSource:s.priceSource||(s.price!==''&&s.price!=null?'manual':undefined)})),
+    addedAt:m.type==='edit'?(getList()?.parts.find(p=>p.id===m.partId)?.addedAt||Date.now()):Date.now()
+  };
+  const list=getList();
+  if(m.type==='add'){list.parts.push(part);}
+  else{const i=list.parts.findIndex(p=>p.id===part.id);if(i>=0)list.parts[i]=part;}
+  state.modal=null;save();render();
+};
+
+window.deletePart=id=>{
+  if(!confirm('Delete this part?'))return;
+  const list=getList();list.parts=list.parts.filter(p=>p.id!==id);save();render();
+};
+
+window.fetchOneSup=async sid=>{
+  if(!state.modal)return;
+  const s=state.modal.suppliers.find(x=>x.id===sid);if(!s)return;
+  const urlEl=document.querySelector(`[data-sid="${sid}"] input[type=url]`);
+  if(urlEl)s.url=urlEl.value;
+  const el=document.getElementById('fstatus-'+sid);
+  if(!s.url){if(el){el.textContent='Enter a URL first';el.className='supplier-fetch-status status-err';}return;}
+  if(el){el.innerHTML='<span class="dot-fetching"></span> Fetching…';el.className='supplier-fetch-status status-loading';}
+  const{price,err}=await fetchPrice(s.url);
+  if(price!=null){s.price=price;s.priceSource='fetched';s.fetchedAt=Date.now();s.fetchErr=null;}
+  else{s.priceSource=s.priceSource||'manual';s.fetchErr=err;}
+  if(el){
+    if(price!=null){el.textContent=`✓ Found $${price.toFixed(2)}`;el.className='supplier-fetch-status status-ok';const pe=document.querySelector(`[data-sid="${sid}"] input[type=number]`);if(pe)pe.value=price.toFixed(2);}
+    else{el.textContent='Could not find price — enter manually';el.className='supplier-fetch-status status-err';}
+  }
+};
+
+window.fetchAllPrices=async()=>{
+  const list=getList();if(!list||!list.parts.length)return;
+  const allSups=list.parts.flatMap(p=>p.suppliers.filter(s=>s.url));
+  if(!allSups.length){alert('No supplier URLs found in this list.');return;}
+  state.fetchProgress={done:0,total:allSups.length};render();
+
+  function updateRowInDOM(part){
+    const bp=bestPrice(part);
+    const row=document.querySelector(`tr[data-partid="${part.id}"]`);if(!row)return;
+    const pc=row.querySelector('.price-cell');
+    if(pc){
+      const priced=part.suppliers.filter(s=>s.price!==''&&s.price!=null&&!isNaN(parseFloat(s.price)));
+      pc.innerHTML=bp!=null?`<span class="price-best">$${bp.toFixed(2)}</span>${priced.length>1?`<div style="font-size:11px;color:var(--text3);margin-top:1px">${priced.length} suppliers</div>`:''}`:`<span class="price-none">not set</span>`;
+    }
+    const cc=row.querySelector('.supplier-chips');
+    if(cc){
+      cc.innerHTML=part.suppliers.map(s=>{
+        const hasPrice=s.price!==''&&s.price!=null&&!isNaN(parseFloat(s.price));
+        const isManual=hasPrice&&s.priceSource!=='fetched';
+        return`<span class="chip ${hasPrice?'has-price':''}${isManual&&s.url?' chip-stale':''}" onclick="openPriceDetail('${part.id}')">${esc(s.name||'?')}${hasPrice?' · $'+parseFloat(s.price).toFixed(2)+(isManual&&s.url?' ⚠':''):''}</span>`;
+      }).join('');
+    }
+  }
+
+  for(const part of list.parts){
+    const row=document.querySelector(`tr[data-partid="${part.id}"]`);
+    if(row){const pc=row.querySelector('.price-cell');if(pc)pc.innerHTML=`<span style="color:var(--text3)"><span class="dot-fetching"></span></span>`;}
+    for(const s of part.suppliers){
+      if(s.url){
+        const{price,err}=await fetchPrice(s.url);
+        if(price!=null){s.price=price;s.priceSource='fetched';s.fetchedAt=Date.now();s.fetchErr=null;}
+        else{s.priceSource=s.priceSource||'manual';s.fetchErr=err;}
+        state.fetchProgress.done++;
+        const bar=document.querySelector('.progress-bar-fill');
+        const txt=document.querySelector('.fetch-progress');
+        if(bar)bar.style.width=Math.round(state.fetchProgress.done/state.fetchProgress.total*100)+'%';
+        if(txt)txt.innerHTML=`<span class="dot-fetching"></span>Fetching ${state.fetchProgress.done}/${state.fetchProgress.total}`;
+        updateRowInDOM(part);
+      }
+    }
+  }
+  state.fetchProgress=null;save();render();
+};
+
+window.exportCSV=()=>{
+  const list=getList();if(!list)return;
+  const maxSup=Math.max(1,...list.parts.map(p=>p.suppliers.length));
+  const supHeaders=Array.from({length:maxSup},(_,i)=>[`supplier${i+1}Name`,`supplier${i+1}URL`,`supplier${i+1}Price`]).flat();
+  const rows=[['name','partNum','notes',...supHeaders]];
+  for(const p of list.parts){
+    const sups=p.suppliers.flatMap(s=>[s.name||'',s.url||'',s.price!=null?s.price:'']);
+    const pad=Array((maxSup-p.suppliers.length)*3).fill('');
+    rows.push([p.name,p.partNum||'',p.notes||'',...sups,...pad]);
+  }
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=`${list.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_parts.csv`;a.click();
+};
+
+window.loadCSVFile=input=>{
+  const file=input.files[0];if(!file)return;
+  const r=new FileReader();r.onload=e=>{const t=document.getElementById('csv-text');if(t)t.value=e.target.result;};r.readAsText(file);
+};
+
+window.doImport=()=>{
+  const raw=document.getElementById('csv-text')?.value?.trim();
+  if(!raw){alert('Paste or upload a CSV file first.');return;}
+  const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length<2){alert('No data rows found.');return;}
+  const headers=parseCSVRow(lines[0]).map(h=>h.toLowerCase().trim());
+  const parts=[];
+  for(let i=1;i<lines.length;i++){
+    const vals=parseCSVRow(lines[i]);
+    const get=h=>{const idx=headers.indexOf(h);return idx>=0?(vals[idx]||'').trim():'';};
+    const suppliers=[];let si=1;
+    while(headers.includes(`supplier${si}name`)){
+      const sn=get(`supplier${si}name`),su=get(`supplier${si}url`),sp=get(`supplier${si}price`);
+      if(sn||su||sp)suppliers.push({id:uid(),name:sn,url:su,price:sp?parseFloat(sp):'',priceSource:'manual'});
+      si++;
+    }
+    const name=get('name');
+    if(name)parts.push({id:uid(),name,partNum:get('partnum')||get('part#')||'',notes:get('notes'),suppliers,addedAt:Date.now()});
+  }
+  if(!parts.length){alert('No valid parts found.');return;}
+  getList().parts.push(...parts);state.modal=null;save();render();
+  setTimeout(()=>alert(`✓ Imported ${parts.length} part${parts.length!==1?'s':''}`),50);
+};
+
+function parseCSVRow(row){
+  const res=[];let cur='',inQ=false;
+  for(let i=0;i<row.length;i++){
+    const c=row[i];
+    if(c==='"'){if(inQ&&row[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(c===','&&!inQ){res.push(cur);cur='';}
+    else cur+=c;
+  }
+  res.push(cur);return res;
+}
+
+// ── Quick check ──
+window.openQuickCheck=()=>{
+  const list=getList();
+  if(!list)return;
+  // Collect all Repco suppliers with URLs (or all manual-priced suppliers with URLs)
+  const items=[];
+  for(const part of list.parts){
+    for(const s of part.suppliers){
+      if(!s.url)continue;
+      // Include repco always, plus any manual/stale priced items from other retailers
+      const isRepco=s.url.includes('repco.com.au');
+      const isManual=s.priceSource!=='fetched';
+      if(isRepco||(isManual&&s.price!=null&&s.price!=='')){
+        items.push({partId:part.id,supplierId:s.id,partName:part.name,supplierName:s.name||'Unknown',url:s.url,currentPrice:s.price});
+      }
+    }
+  }
+  if(!items.length){alert('No manual-priced suppliers found. All prices are either auto-fetched or have no URL.');return;}
+  state.modal={type:'quickcheck',items,index:0};
+  render();
+  // Auto-open first URL
+  if(items[0])setTimeout(()=>window.open(items[0].url,'_blank'),300);
+};
+
+window.quickCheckSave=()=>{
+  const m=state.modal;if(!m||m.type!=='quickcheck')return;
+  const priceEl=document.getElementById('qc-price');
+  const val=priceEl?parseFloat(priceEl.value):null;
+  if(val!=null&&!isNaN(val)&&val>0){
+    const item=m.items[m.index];
+    const list=getList();
+    const part=list?.parts.find(p=>p.id===item.partId);
+    const sup=part?.suppliers.find(s=>s.id===item.supplierId);
+    if(sup){sup.price=val;sup.priceSource='manual';sup.fetchedAt=Date.now();sup.fetchErr=null;}
+    save();
+  }
+  quickCheckNext();
+};
+
+window.quickCheckSkip=()=>quickCheckNext();
+
+function quickCheckNext(){
+  const m=state.modal;if(!m)return;
+  m.index++;
+  if(m.index<m.items.length){
+    render();
+    // Auto-open next URL
+    setTimeout(()=>window.open(m.items[m.index].url,'_blank'),300);
+  } else {
+    render();
+  }
+}
+
+initGoogleAuth();
+</script>
+</body>
+</html>
